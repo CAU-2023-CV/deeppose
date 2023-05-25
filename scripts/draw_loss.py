@@ -18,7 +18,7 @@ else:
     import matplotlib.pyplot as plt
 
 
-def draw_loss_curve(logfile, outfile):
+def draw_loss_curve(logfile, outfile): #log file loss 작성
     try:
         train_loss = []
         test_loss = []

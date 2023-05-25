@@ -20,7 +20,7 @@ class PoseDataset(dataset_mixin.DatasetMixin):
                  zoom, base_zoom, zoom_range, translate, translate_range,
                  min_dim, coord_normalize, gcn, joint_num, fname_index,
                  joint_index, symmetric_joints, ignore_label):
-        for key, val in locals().items():
+        for key, val in locals().items(): #현재 local변수를 dict타입으로 만들어줌. 즉, arg로 받은 값들으로 해당 클래스의 각 변수 설정해줌.
             setattr(self, key, val)
         self.symmetric_joints = json.loads(symmetric_joints)
         self.load_images()

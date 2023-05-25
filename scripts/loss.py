@@ -1,8 +1,9 @@
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+
+from abc import ABC
 
 import numpy
 from chainer import reporter
@@ -12,7 +13,6 @@ from chainer.utils import type_check
 
 
 class MeanSquaredError(chainer.Function):
-
     """Mean squared error (a.k.a. Euclidean loss) function.
 
     In forward method, it calculates mean squared error between two variables
@@ -20,6 +20,10 @@ class MeanSquaredError(chainer.Function):
     position is 0.
 
     """
+
+    def __init__(self):
+        self.count = 0
+        self.diff = 0.0
 
     def check_type_forward(self, in_types):
         type_check.expect(in_types.size() == 2)
@@ -33,7 +37,7 @@ class MeanSquaredError(chainer.Function):
 
     def forward(self, inputs):
         x, t, ignore = inputs
-        xp = chainer.cuda.get_array_module(x)
+        xp = chainer.backend.get_array_module(x)  # chainer.cuda -> chainer.backend
         self.count = int(ignore.sum())
         self.diff = (x * ignore - t * ignore).astype(xp.float32)
         diff = self.diff.ravel()
@@ -56,6 +60,10 @@ def mean_squared_error(x0, x1, ignore):
 
 
 class PoseEstimationError(chainer.Chain):
+
+    @classmethod
+    def from_params(cls, *args, **kwargs): #?? 공식문서 봐도 딱히 나와있는 내용은 없는데 추가하라고 에러뜸
+        pass
 
     def __init__(self, predictor):
         super(PoseEstimationError, self).__init__(predictor=predictor)

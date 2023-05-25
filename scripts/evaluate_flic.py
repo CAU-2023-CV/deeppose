@@ -1,4 +1,3 @@
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -7,16 +6,16 @@ from __future__ import unicode_literals
 import tempfile
 
 import grep as grep
-from PIL.ImageTransform import Transform
-from chainer import cuda
+from transform import Transform
+from chainer import backends
 from chainer import serializers
 from chainer import Variable
-
 
 import argparse
 import cv2 as cv
 import glob
-import imp
+import importlib
+import importlib.machinery
 import numpy as np
 import os
 import re
@@ -40,8 +39,8 @@ def cropping(img, joints, min_dim):
     h *= 1.5
 
     # clipping
-    x, y, w, h = [int(z) for z in [x, y, w, h]]
-    x = np.clip(x, 0, img.shape[1] - 1)
+    x, y, w, h = [int(z) for z in [x, y, w, h]]  # int로
+    x = np.clip(x, 0, img.shape[1] - 1)  # min보다 작은건 min으로, max보다 큰건 max로
     y = np.clip(y, 0, img.shape[0] - 1)
     w = np.clip(w, 1, img.shape[1] - (x + 1))
     h = np.clip(h, 1, img.shape[0] - (y + 1))
@@ -81,7 +80,7 @@ def input_transform(datum, datadir, fname_index, joint_index, min_dim, gcn):
     img = cv.imread(img_fn)
     joints = np.asarray([int(float(p)) for p in datum[joint_index:]])
     img, joints = cropping(img, joints, min_dim)
-    img, joints = resize(img, joints, img.shape[0]) #정사각형으로 가정
+    img, joints = resize(img, joints, img.shape[0])  # 정사각형으로 가정
     if gcn:
         img = contrast(img)
     else:
@@ -93,7 +92,8 @@ def input_transform(datum, datadir, fname_index, joint_index, min_dim, gcn):
 def load_model(args):
     model_fn = os.path.basename(args.model)
     model_name = model_fn.split('.')[0]
-    model = imp.load_source(model_name, args.model)
+    loader = importlib.machinery.SourceFileLoader(model_name, args.model)
+    model = loader.load_module()
     model = getattr(model, model_name)
     model = model(args.joint_num)
     serializers.load_npz(args.param, model)
@@ -139,6 +139,7 @@ def create_tiled_image(perm, out_dir, result_dir, epoch, suffix, N=25):
         canvas = cv.resize(canvas, (args.resize, args.resize))
     cv.imwrite('%s/test_%d_tiled_%s.jpg' % (result_dir, epoch, suffix), canvas)
 
+
 def draw_joints(self, image, joints, prefix, ignore_joints):
     if image.shape[2] != 3:
         _image = image.transpose(1, 2, 0).copy()
@@ -166,6 +167,7 @@ def draw_joints(self, image, joints, prefix, ignore_joints):
     fn_img = fn_img + '.png'
     cv.imwrite(fn_img, _image)
 
+
 def test(args):
     # test data
     test_fn = '%s/test_joints.csv' % args.datadir
@@ -173,13 +175,13 @@ def test(args):
 
     # load model
     if args.gpu >= 0:
-        cuda.get_device(args.gpu).use()
+        backends.cuda.get_device_from_array(args.gpu).use()
     model = load_model(args)
     if args.gpu >= 0:
         model.to_gpu(args.gpu)
 
     # create output dir
-    epoch = int(re.search('epoch-([0-9]+)', args.param).groups()[0])
+    epoch = int(re.search('epoch-([0-9]+)', args.param).groups()[0])  # args.aram에서 epoch-(숫자) 형식 찾아서 0번째 -> int로
     result_dir = os.path.dirname(args.param)
     out_dir = '%s/test_%d' % (result_dir, epoch)
     if not os.path.exists(out_dir):
@@ -191,12 +193,12 @@ def test(args):
     N = len(test_dl)
     for i in range(0, N, args.batchsize):
         lines = test_dl[i:i + args.batchsize]
-        trans = Transform(args)
+        trans = Transform(args)  # Transform이 뭔지를 모르겠다??
         input_data, labels = load_data(trans, args, lines)
 
         if args.gpu >= 0:
-            input_data = cuda.to_gpu(input_data.astype(np.float32))
-            labels = cuda.to_gpu(labels.astype(np.float32))
+            input_data = backends.cuda.to_gpu(input_data.astype(np.float32))
+            labels = backends.cuda.to_gpu(labels.astype(np.float32))
         else:
             input_data = input_data.astype(np.float32)
             labels = labels.astype(np.float32)
@@ -206,9 +208,9 @@ def test(args):
         model(x, t)
 
         if args.gpu >= 0:
-            preds = cuda.to_cpu(model.pred.data)
-            input_data = cuda.to_cpu(input_data)
-            labels = cuda.to_cpu(labels)
+            preds = backends.cuda.to_cpu(model.pred.data)
+            input_data = backends.cuda.to_cpu(input_data)
+            labels = backends.cuda.to_cpu(labels)
         else:
             preds = model.pred.data
 
@@ -233,9 +235,9 @@ def test(args):
             label = [tuple(p) for p in label]
 
             # all limbs
-            img_label = draw_joints(
+            draw_joints(
                 img_label, label, args.draw_limb, args.text_scale)
-            img_pred = draw_joints(
+            draw_joints(
                 img_pred, pred, args.draw_limb, args.text_scale)
 
             msg = '{:5}/{:5} {}\terror:{}\tmean_error:{}'.format(
@@ -268,9 +270,6 @@ def tile(args):
 if __name__ == '__main__':
     sys.path.append('tests')
     sys.path.append('models')
-
-
-
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str,
                         help='model definition file in models dir')
