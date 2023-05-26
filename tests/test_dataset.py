@@ -14,6 +14,10 @@ import sys
 import tempfile
 import unittest
 
+# mitmul의 PR 목록 중 " update code base for chainer v4 " 브랜치의 test 폴더 참조
+# 이 코드는 이용되지 않고 test_alexnet 이용
+
+# ------------------ 그전 주석
 # 이게 근데 사용 되는 곳이 없고 우리가 지정해야 하는듯..?
 # ctrl shift f 로 모든 파일에 찾아도 이 코드를 실행하는 곳이 없어서 의문..
 
