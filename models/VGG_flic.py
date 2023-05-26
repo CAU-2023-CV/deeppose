@@ -53,7 +53,10 @@ class VGG_BN(chainer.Chain):
         # Linear에서 입력을 None으로 결정할 경우, 최초의 순전파 시 크기가 결정됨
         links += [('fc6', L.Linear(None, 4096))]
         links += [('fc7', L.Linear(4096, 4096))]
-        links += [('fc8', L.Linear(4096, out_size ** 2))]
+
+        # 오류 수정: out_size 없는 것 대신 n_joints 변수
+        # links += [('fc8', L.Linear(4096, out_size ** 2))]
+        links += [('fc8', L.Linear(4096, n_joints * 2))]
         for link in links:
             self.add_link(*link)
 
