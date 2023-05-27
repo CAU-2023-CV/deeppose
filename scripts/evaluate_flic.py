@@ -97,7 +97,7 @@ def load_model(args):
     model = getattr(model, model_name)
     model = model(args.joint_num)
     serializers.load_npz(args.param, model)
-    model.train = False
+    model.train = False #??
 
     return model
 
@@ -193,7 +193,7 @@ def test(args):
     N = len(test_dl)
     for i in range(0, N, args.batchsize):
         lines = test_dl[i:i + args.batchsize]
-        trans = Transform(args)  # Transform이 뭔지를 모르겠다??
+        trans = Transform(args)
         input_data, labels = load_data(trans, args, lines)
 
         if args.gpu >= 0:
@@ -212,7 +212,7 @@ def test(args):
             input_data = backends.cuda.to_cpu(input_data)
             labels = backends.cuda.to_cpu(labels)
         else:
-            preds = model.pred.data
+            preds = model.pred.data #?? -> model 코드가 바꼈음
 
         for n, line in enumerate(lines):
             img_fn = line.split(',')[args.fname_index]
@@ -231,8 +231,8 @@ def test(args):
             # create pred, label tuples
             img_pred = np.array(img_pred.copy())
             img_label = np.array(img_label.copy())
-            pred = [tuple(p) for p in pred]
-            label = [tuple(p) for p in label]
+            pred = [tuple(p) for p in pred] #prediction..?
+            label = [tuple(p) for p in label] #label
 
             # all limbs
             draw_joints(
@@ -267,7 +267,7 @@ def tile(args):
     create_tiled_image(perm, out_dir, result_dir, epoch, 'label', args.n_imgs)
 
 
-if __name__ == '__main__':
+if __name__ == '__main__': #또다른 메인..? 이거는 테스트용인듯.
     sys.path.append('tests')
     sys.path.append('models')
     parser = argparse.ArgumentParser()

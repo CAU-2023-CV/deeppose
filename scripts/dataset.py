@@ -68,7 +68,7 @@ class PoseDataset(dataset_mixin.DatasetMixin):
             ig = np.array(list(zip(ig[0::2], ig[1::2])))
             available_joints = self.get_available_joints(joints, ig)
             bbox_w, bbox_h = self.calc_joint_bbox_size(available_joints)
-            if bbox_w < self.min_dim or bbox_h < self.min_dim:
+            if bbox_w < self.min_dim or bbox_h < self.min_dim: #최소 크기 이하면 joints에 append하지 않고 넘김
                 continue
 
             self.joints.append((image_id, joints))
