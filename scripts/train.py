@@ -16,8 +16,6 @@ from chainer import training
 from chainer.training import extensions
 from transform import Transform
 from chainer import dataset
-from chainercv.chainer_experimental.datasets.sliceable import TransformDataset
-from chainercv import transforms
 from PIL import Image
 import random
 
@@ -25,6 +23,7 @@ import chainer
 import cmd_options
 import dataset
 import importlib #imp is deprecated, imp -> importlib
+from importlib.machinery import SourceFileLoader
 import logger
 import logging
 import loss
@@ -69,7 +68,7 @@ def create_logger(args, result_dir):
 def get_model(model_path, n_joints, result_dir, resume_model):
     model_fn = os.path.basename(model_path)
     model_name = model_fn.split('.')[0]
-    model = importlib.load_source(model_name, model_path) #model 파일 소스 받아옴
+    model = SourceFileLoader(model_name, model_path).load_module()#model 파일 소스 받아옴
     model = getattr(model, model_name) #해당 모델 객체를 가져옴
 
     # Initialize
