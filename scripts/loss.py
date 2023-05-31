@@ -40,7 +40,7 @@ class MeanSquaredError(chainer.Function):
         x, t, ignore = inputs
         xp = chainer.backend.get_array_module(x)  # chainer.cuda -> chainer.backend
         self.count = int(ignore.sum())
-        self.diff = (numpy.dot(x,ignore) - numpy.dot(t,ignore)).astype(xp.float32)
+        self.diff = (x*ignore - t*ignore).astype(xp.float32)
         diff = self.diff.ravel()
         return xp.asarray(diff.dot(diff) / self.count, dtype=xp.float32),
 
@@ -82,52 +82,3 @@ class PoseEstimationError(chainer.Chain):
         reporter.report({'loss': self.loss}, self)
         return self.loss
     
-#     Exception in main training loop: shapes (128,28) and (128,32) not aligned: 28 (dim 1) != 128 (dim 0)
-# Traceback (most recent call last):
-#   File "C:\Users\pc03\anaconda3\lib\site-packages\chainer\training\trainer.py", line 343, in run
-#     update()
-#   File "C:\Users\pc03\anaconda3\lib\site-packages\chainer\training\updaters\standard_updater.py", line 240, in update
-#     self.update_core()
-#   File "C:\Users\pc03\anaconda3\lib\site-packages\chainer\training\updaters\parallel_updater.py", line 131, in update_core
-#     loss = loss_func(*in_arrays)
-#   File "C:\Users\pc03\deeppose\scripts\loss.py", line 81, in __call__
-#     self.loss = self.lossfun(self.y, t, ignore)
-#   File "C:\Users\pc03\deeppose\scripts\loss.py", line 60, in mean_squared_error
-#     return MeanSquaredError()(x0, x1, ignore)
-#   File "C:\Users\pc03\anaconda3\lib\site-packages\chainer\function.py", line 307, in __call__
-#     ret = node.apply(inputs)
-#   File "C:\Users\pc03\anaconda3\lib\site-packages\chainer\function_node.py", line 334, in apply
-#     outputs = self.forward(in_data)
-#   File "C:\Users\pc03\anaconda3\lib\site-packages\chainer\function.py", line 179, in forward
-#     return self._function.forward(inputs)
-#   File "C:\Users\pc03\deeppose\scripts\loss.py", line 43, in forward
-#     self.diff = (numpy.dot(x,ignore) - numpy.dot(t,ignore)).astype(xp.float32)
-#   File "<__array_function__ internals>", line 180, in dot
-# Will finalize trainer extensions and updater before reraising the exception.
-# Traceback (most recent call last):
-#   File "C:\Users\pc03\deeppose\scripts\train.py", line 243, in <module>
-#     trainer.run()
-#   File "C:\Users\pc03\anaconda3\lib\site-packages\chainer\training\trainer.py", line 376, in run
-#     six.reraise(*exc_info)
-#   File "C:\Users\pc03\anaconda3\lib\site-packages\six.py", line 719, in reraise
-#     raise value
-#   File "C:\Users\pc03\anaconda3\lib\site-packages\chainer\training\trainer.py", line 343, in run
-#     update()
-#   File "C:\Users\pc03\anaconda3\lib\site-packages\chainer\training\updaters\standard_updater.py", line 240, in update
-#     self.update_core()
-#   File "C:\Users\pc03\anaconda3\lib\site-packages\chainer\training\updaters\parallel_updater.py", line 131, in update_core
-#     loss = loss_func(*in_arrays)
-#   File "C:\Users\pc03\deeppose\scripts\loss.py", line 81, in __call__
-#     self.loss = self.lossfun(self.y, t, ignore)
-#   File "C:\Users\pc03\deeppose\scripts\loss.py", line 60, in mean_squared_error
-#     return MeanSquaredError()(x0, x1, ignore)
-#   File "C:\Users\pc03\anaconda3\lib\site-packages\chainer\function.py", line 307, in __call__
-#     ret = node.apply(inputs)
-#   File "C:\Users\pc03\anaconda3\lib\site-packages\chainer\function_node.py", line 334, in apply
-#     outputs = self.forward(in_data)
-#   File "C:\Users\pc03\anaconda3\lib\site-packages\chainer\function.py", line 179, in forward
-#     return self._function.forward(inputs)
-#   File "C:\Users\pc03\deeppose\scripts\loss.py", line 43, in forward
-#     self.diff = (numpy.dot(x,ignore) - numpy.dot(t,ignore)).astype(xp.float32)
-#   File "<__array_function__ internals>", line 180, in dot
-# ValueError: shapes (128,28) and (128,32) not aligned: 28 (dim 1) != 128 (dim 0)
