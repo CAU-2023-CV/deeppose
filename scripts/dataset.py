@@ -165,7 +165,7 @@ class PoseDataset(dataset_mixin.DatasetMixin):
         if self.rotate:
             image, joints = self.apply_rotate(image, joints, ignore_joints)
         if self.translate:
-            image, joitns = self.apply_translate(image, joints)
+            image, joints = self.apply_translate(image, joints)
         if self.zoom:
             image, joints, cx, cy = self.apply_zoom(image, joints, cx, cy)
 
@@ -182,5 +182,5 @@ class PoseDataset(dataset_mixin.DatasetMixin):
         image = image.astype(np.float32).transpose(2, 0, 1)
         joints = joints.astype(np.float32).flatten()
         ignore_joints = np.array(ignore_joints, dtype=np.int32).flatten()
-
+        
         return image, joints, ignore_joints
