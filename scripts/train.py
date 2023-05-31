@@ -241,6 +241,3 @@ if __name__=='__main__':
         trigger = (args.valid_freq, 'epoch')
     ) #Perform test every this epoch : valid_freq마다 test_iter에 대해서(dataset iterator) eval_model을 평가하는듯.
     trainer.run()
-
-
-
