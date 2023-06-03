@@ -14,17 +14,6 @@ import sys
 import tempfile
 import unittest
 
-# mitmul의 PR 목록 중 " update code base for chainer v4 " 브랜치의 test 폴더 참조
-# 이 코드는 이용되지 않고 test_alexnet 이용
-
-# ------------------ 그전 주석
-# 이게 근데 사용 되는 곳이 없고 우리가 지정해야 하는듯..?
-# ctrl shift f 로 모든 파일에 찾아도 이 코드를 실행하는 곳이 없어서 의문..
-
-## 추가 ) 개빡;;
-# 현재 이 코드는 삭제되었음. 왜인지 모르겠는데 이코드 주인이 chainer 업데이트 하면서 새로운 코드를 만들었는데 왜 PR만 넣고 왜 안받았지? 자기거 아님?
-# pr에 있는 test_alexnet, test_flic_dataset 코드를 봐야 함
-
 
 class TestPoseDataset(unittest.TestCase):
 
@@ -177,8 +166,6 @@ class TestPoseDataset(unittest.TestCase):
             np.testing.assert_allclose(
                 image.reshape(-1, 3).std(axis=0), [1., 1., 1.], atol=1e-5)
 
-
-    # 데이터셋별 테스트
     def test_flic(self):
         img_dir = 'data/FLIC-full/images'
         symmetric_joints = '[[2, 4], [1, 5], [0, 6]]'

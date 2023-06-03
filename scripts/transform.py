@@ -13,7 +13,7 @@ class Transform(object):
 
     def transform(self, datum, datadir, train=True,
                   fname_index=0, joint_index=1):
-        img_fn = '%s/images/%s' % (datadir, datum[fname_index])
+        img_fn = '%s/images/%s' % (datadir, datum[self.fname_index])
         if not os.path.exists(img_fn):
             raise Exception('%s is not exist' % img_fn)
         self._img = cv.imread(img_fn)
@@ -25,7 +25,7 @@ class Transform(object):
         if hasattr(self, 'flip'):
             self.fliplr()
         if hasattr(self, 'size'):
-            self.resize()
+            self.resizeFunc()
         if hasattr(self, 'lcn'):
             self.contrast()
 
@@ -71,12 +71,12 @@ class Transform(object):
         joints = np.asarray([(j[0] - x, j[1] - y) for j in joints])
         self._joints = joints.flatten()
 
-    def resize(self):
+    def resizeFunc(self):
         if not isinstance(self.size, int):
             raise Exception('self.size should be int')
         orig_h, orig_w, _ = self._img.shape
-        self._joints[0::2] = self._joints[0::2] / float(orig_w) * self.size
-        self._joints[1::2] = self._joints[1::2] / float(orig_h) * self.size
+        self._joints[0::2] = self._joints[0::2] / float(orig_w) * self.resize
+        self._joints[1::2] = self._joints[1::2] / float(orig_h) * self.resize
         self._img = cv.resize(self._img, (self.size, self.size),
                               interpolation=cv.INTER_NEAREST)
 
@@ -113,7 +113,12 @@ class Transform(object):
         joints[:, 0] *= w
         joints[:, 1] *= h
         joints += center_pt
+        #joints = chainer.as_array(joints)
+        for i in range(joints.shape[0]):
+            for j in range(joints.shape[1]):
+                joints[i][j] = int(joints[i][j].item())
         joints = joints.astype(np.int32)
+        #joints = joints.astype(np.int32)
 
         if hasattr(self, 'lcn') and self.lcn:
             img -= img.min()

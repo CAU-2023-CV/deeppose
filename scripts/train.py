@@ -5,7 +5,7 @@ from __future__ import unicode_literals
 
 import ctypes
 from ctypes import Array
-from multiprocessing import Process
+from threading import Thread
 from queue import Queue
 
 import numpy as np
@@ -136,7 +136,7 @@ def load_data(args, input_q, minibatch_q):
     label = label.reshape((args.batchsize, d))
 
     x_queue, o_queue = Queue(), Queue()
-    workers = [Process(target=transform,
+    workers = [Thread(target=transform,
                        args = (args, x_queue, args.datadir, args.fname_index,
                                args.join_index, o_queue))
                for _ in range(args.batchsize)] #batchsize만큼 Process worker 생성
@@ -213,10 +213,12 @@ if __name__=='__main__':
     trainer.extend(extensions.DumpGraph('main/loss')) #can register extensions to the trainer, where some configurations can be added.
     #3.0~버전에서는 dump_graph였는데 최신 버전에서는 DumpGraph인듯..? dump_graph도 오류는 안 뜨는데 일단 변경함
     trainer.extend(extensions.snapshot_object(
-        model, 'epoch-{.updater.epoch}.model'), trigger=interval)
+        model, 'epoch-{.updater.epoch}-model.npz', savefun=serializers.save_npz), trigger=interval)
     trainer.extend(extensions.snapshot_object(
-        opt, 'epoch-{.updater.epoch}.state'), trigger=interval)
+        opt, 'epoch-{.updater.epoch}-state.npz', savefun=serializers.save_npz), trigger=interval)
     trainer.extend(extensions.snapshot(), trigger=interval)
+    # writer = extensions.snapshot_writers.ProcessWriter(savefun=serializers.save_npz)
+    # trainer.extend(extensions.snapshot(writer=writer), trigger=interval)
     #graph, snapshot 추가함. trigger object that determines when to invoke the extension -> snapshot 횟수마다 해당 extension 수행되는 것 같음.
 
     if args.opt == 'MomentumSGD' or args.opt == 'AdaGrad':
@@ -241,3 +243,6 @@ if __name__=='__main__':
         trigger = (args.valid_freq, 'epoch')
     ) #Perform test every this epoch : valid_freq마다 test_iter에 대해서(dataset iterator) eval_model을 평가하는듯.
     trainer.run()
+
+
+

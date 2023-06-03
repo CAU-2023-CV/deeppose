@@ -4,11 +4,11 @@
 CHAINER_TYPE_CHECK=0 \
 python scripts/train.py \
 --model models/AlexNet.py \
---gpus -1 \
+--gpus 0 \
 --epoch 100 \
 --batchsize 128 \
---snapshot 10 \
---valid_freq 5 \
+--snapshot 1 \
+--valid_freq 1 \
 --train_csv_fn data/mpii/train_joints.csv \
 --test_csv_fn data/mpii/test_joints.csv \
 --img_dir data/mpii/images \

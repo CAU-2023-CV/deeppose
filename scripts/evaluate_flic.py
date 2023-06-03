@@ -7,6 +7,7 @@ import tempfile
 
 import grep as grep
 from transform import Transform
+import chainer
 from chainer import backends
 from chainer import serializers
 from chainer import Variable
@@ -20,6 +21,8 @@ import numpy as np
 import os
 import re
 import sys
+import loss
+import dataset
 
 
 def cropping(img, joints, min_dim):
@@ -96,6 +99,11 @@ def load_model(args):
     model = loader.load_module()
     model = getattr(model, model_name)
     model = model(args.joint_num)
+    np_Array = np.load(args.param)
+    np_newArray = dict(np_Array)
+    for i in np_Array.files:
+        np_newArray[i[10:]] = np_Array[i]
+    np.savez(args.param, **np_newArray)
     serializers.load_npz(args.param, model)
     model.train = False #??
 
@@ -103,18 +111,16 @@ def load_model(args):
 
 
 def load_data(trans, args, x):
-    c = args.channel
+    c= 3
     s = args.size
     d = args.joint_num * 2
-
-    # data augmentation
-    input_data = np.zeros((len(x), c, s, s))
-    label = np.zeros((len(x), d))
+    
+    input_data = np.zeros((len(x),c,s,s))
+    label = np.zeros((len(x),d))
 
     for i, line in enumerate(x):
-        d, t = trans.transform(line.split(','), args.datadir,
-                               args.fname_index, args.joint_index)
-        input_data[i] = d.transpose((2, 0, 1))
+        d,t = trans.transform(line.split(','), args.datadir, args.fname_index, args.joint_index)
+        input_data[i] = d.transpose((2,0,1))
         label[i] = t
 
     return input_data, label
@@ -140,32 +146,37 @@ def create_tiled_image(perm, out_dir, result_dir, epoch, suffix, N=25):
     cv.imwrite('%s/test_%d_tiled_%s.jpg' % (result_dir, epoch, suffix), canvas)
 
 
-def draw_joints(self, image, joints, prefix, ignore_joints):
+def draw_joints(image, joints, prefix, ignore_joints):
     if image.shape[2] != 3:
         _image = image.transpose(1, 2, 0).copy()
     else:
         _image = image.copy()
+
     if joints.ndim == 1:
         joints = np.array(list(zip(joints[0::2], joints[1::2])))
+
     if ignore_joints.ndim == 1:
         ignore_joints = np.array(
             list(zip(ignore_joints[0::2], ignore_joints[1::2])))
+
     for i, (x, y) in enumerate(joints):
         if ignore_joints is not None \
                 and (ignore_joints[i][0] == 0 or ignore_joints[i][1] == 0):
             continue
-        cv.circle(_image, (int(x), int(y)), 2, (0, 0, 255), -1)
-        cv.putText(
+        _image = cv.circle(_image, (int(x), int(y)), 2, (0, 0, 255), -1)
+        _image = cv.putText(
             _image, str(i), (int(x), int(y)), cv.FONT_HERSHEY_SIMPLEX,
             1.0, (255, 255, 255), 3)
-        cv.putText(
+        _image = cv.putText(
             _image, str(i), (int(x), int(y)), cv.FONT_HERSHEY_SIMPLEX,
             1.0, (0, 0, 0), 1)
+
     _, fn_img = tempfile.mkstemp()
     basename = os.path.basename(fn_img)
-    fn_img = fn_img.replace(basename, prefix + basename)
+    fn_img = fn_img.replace(basename, basename)
     fn_img = fn_img + '.png'
-    cv.imwrite(fn_img, _image)
+    return _image
+    #cv.imwrite(fn_img, _image)
 
 
 def test(args):
@@ -191,9 +202,10 @@ def test(args):
 
     mean_error = 0.0
     N = len(test_dl)
+
     for i in range(0, N, args.batchsize):
         lines = test_dl[i:i + args.batchsize]
-        trans = Transform(args)
+        trans = Transform(vars(args))
         input_data, labels = load_data(trans, args, lines)
 
         if args.gpu >= 0:
@@ -202,17 +214,27 @@ def test(args):
         else:
             input_data = input_data.astype(np.float32)
             labels = labels.astype(np.float32)
-
-        x = Variable(input_data, volatile=True)
-        t = Variable(labels, volatile=True)
-        model(x, t)
+        with chainer.using_config('volatile', True):
+            x = chainer.Variable(input_data)
+            t = chainer.Variable(labels)
+            model = loss.PoseEstimationError(model)
+            ig = labels.astype(np.float32)
+            for i in range(labels.shape[0]):
+                for j in range(labels.shape[1]):
+                    if labels[i][j]==-1:
+                        ig[i][j] = 0
+                    else:
+                        ig[i][j]=1
+                
+            model(x,t,ig)
 
         if args.gpu >= 0:
             preds = backends.cuda.to_cpu(model.pred.data)
             input_data = backends.cuda.to_cpu(input_data)
             labels = backends.cuda.to_cpu(labels)
         else:
-            preds = model.pred.data #?? -> model 코드가 바꼈음
+            preds = model.predictor(x)#?? -> model 코드가 바꼈음
+            #preds = preds.data
 
         for n, line in enumerate(lines):
             img_fn = line.split(',')[args.fname_index]
@@ -231,20 +253,26 @@ def test(args):
             # create pred, label tuples
             img_pred = np.array(img_pred.copy())
             img_label = np.array(img_label.copy())
-            pred = [tuple(p) for p in pred] #prediction..?
-            label = [tuple(p) for p in label] #label
+            pred = np.array([tuple(p) for p in pred]) #prediction..?
+            label = np.array([tuple(p) for p in label]) #label
+            ig_pred = [0 if v == -1 else 1 for v in pred.flatten()]
+            ig_pred  = np.array(list(zip(ig_pred[0::2], ig_pred[1::2])))
+            ig_label = [0 if v == -1 else 1 for v in label.flatten()]
+            ig_label  = np.array(list(zip(ig_label[0::2], ig_label[1::2])))
 
             # all limbs
-            draw_joints(
-                img_label, label, args.draw_limb, args.text_scale)
-            draw_joints(
-                img_pred, pred, args.draw_limb, args.text_scale)
+            img_label = draw_joints(
+                img_label, label, args.draw_limb, ig_label)
+            img_pred = draw_joints(
+                img_pred, pred, args.draw_limb, ig_pred)
 
             msg = '{:5}/{:5} {}\terror:{}\tmean_error:{}'.format(
                 i + n, N, img_fn, error, mean_error / (i + n + 1))
             print(msg, file=fp)
             print(msg)
 
+
+            
             fn, ext = os.path.splitext(img_fn)
             tr_fn = '%s/%d-%d_%s_pred%s' % (out_dir, i, n, fn, ext)
             la_fn = '%s/%d-%d_%s_label%s' % (out_dir, i, n, fn, ext)
@@ -254,7 +282,8 @@ def test(args):
 
 def tile(args):
     # create output dir
-    epoch = int(re.search('epoch-([0-9]+)', args.param).groups()[0])
+    #epoch = int(re.search('epoch-([0-9]+)', args.param).groups()[0])
+    epoch=1
     result_dir = os.path.dirname(args.param)
     out_dir = '%s/test_%d' % (result_dir, epoch)
     if not os.path.exists(out_dir):
@@ -294,16 +323,20 @@ if __name__ == '__main__': #또다른 메인..? 이거는 테스트용인듯.
     args = parser.parse_args()
 
     result_dir = os.path.dirname(args.param)
-    log_fn = grep.grep('{}/log.txt'.format(result_dir))[0]
-    for line in open(log_fn):
-        if 'Namespace' in line:
-            args.joint_num = int(
-                re.search('joint_num=([0-9]+)', line).groups()[0])
-            args.fname_index = int(
-                re.search('fname_index=([0-9]+)', line).groups()[0])
-            args.joint_index = int(
-                re.search('joint_index=([0-9]+)', line).groups()[0])
-            break
+    log_fn ='{}/log.txt'.format(args.param)
+    args.joint_num = 16
+    args.fname_index = 0
+    args.joint_index = 1
+    args.size = 220
+    # for line in open(log_fn):
+    #     if 'Namespace' in line:
+    #         args.joint_num = int(
+    #             re.search('joint_num=([0-9]+)', line).groups()[0])
+    #         args.fname_index = int(
+    #             re.search('fname_index=([0-9]+)', line).groups()[0])
+    #         args.joint_index = int(
+    #             re.search('joint_index=([0-9]+)', line).groups()[0])
+    #         break
 
     if args.mode == 'test':
         test(args)

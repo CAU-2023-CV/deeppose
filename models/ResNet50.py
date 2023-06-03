@@ -13,8 +13,6 @@ import chainer.links as L
 import math
 import numpy as np
 
-# 마찬가지로 큰 구조는 __init__에서 레이어 정의, __cal__에서 신경망 구성
-# residual block (bottleNexk architecture 이용)
 
 class BottleNeckA(chainer.Chain):
 
