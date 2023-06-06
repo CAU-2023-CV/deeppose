@@ -192,8 +192,8 @@ if __name__=='__main__':
         args.joint_index, args.symmetric_joints, args.ignore_label
     ) #test dataset에 대한 PoseDataset 설정(init) -> joint파일 받아오기, image load
 
-    train_iter = iterators.MultithreadIterator(train_dataset, args.batchsize) #example을 parallel하게 불러옴 repat=True, shuffle=None이 default.
-    test_iter = iterators.MultithreadIterator(test_dataset, args.batchsize, repeat=False, shuffle=False)
+    train_iter = iterators.MultithreadIterator(train_dataset, args.batchsize, n_threads = 24) #example을 parallel하게 불러옴 repat=True, shuffle=None이 default.
+    test_iter = iterators.MultithreadIterator(test_dataset, args.batchsize, n_threads = 24, repeat=False, shuffle=False)
     #The dataset is sent to the worker processes in the standard way using pickle.
     #병렬화 처리 초기화하는 코드인듯...
 
