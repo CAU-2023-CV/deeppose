@@ -166,10 +166,10 @@ def draw_joints(image, joints, prefix, ignore_joints):
         _image = cv.circle(_image, (int(x), int(y)), 2, (0, 0, 255), -1)
         _image = cv.putText(
             _image, str(i), (int(x), int(y)), cv.FONT_HERSHEY_SIMPLEX,
-            1.0, (255, 255, 255), 3)
+            0.5, (255, 255, 255), 3)
         _image = cv.putText(
             _image, str(i), (int(x), int(y)), cv.FONT_HERSHEY_SIMPLEX,
-            1.0, (0, 0, 0), 1)
+            0.5, (0, 0, 0), 1)
 
     _, fn_img = tempfile.mkstemp()
     basename = os.path.basename(fn_img)
