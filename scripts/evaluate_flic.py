@@ -364,7 +364,7 @@ if __name__ == '__main__': #또다른 메인..? 이거는 테스트용인듯.
     args.joint_num = 16
     args.fname_index = 0
     args.joint_index = 1
-    #args.size = 220
+    args.size = 220
     # for line in open(log_fn):
     #     if 'Namespace' in line:
     #         args.joint_num = int(
