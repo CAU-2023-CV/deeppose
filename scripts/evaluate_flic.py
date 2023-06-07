@@ -99,12 +99,23 @@ def load_model(args):
     model = loader.load_module()
     model = getattr(model, model_name)
     model = model(args.joint_num)
-    np_Array = np.load(args.param)
-    np_newArray = dict(np_Array)
-    for i in np_Array.files:
-        np_newArray[i[10:]] = np_Array[i]
-    np.savez(args.param, **np_newArray)
-    serializers.load_npz(args.param, model)
+
+    #conv1, conv2, conv3, conv4, conv5, fc6, fc7, fc8
+    path_base="predictor/"
+    tmp = dict(np.load(args.param))
+    for i in tmp:
+        tmp[i] = np.nan_to_num(tmp[i], nan=0)
+    np.savez(args.param, **tmp)
+    
+    serializers.load_npz(args.param, model.conv1, path_base+"conv1/")
+    serializers.load_npz(args.param, model.conv2, path_base+"conv2/")
+    serializers.load_npz(args.param, model.conv3, path_base+"conv3/")
+    serializers.load_npz(args.param, model.conv4, path_base+"conv4/")
+    serializers.load_npz(args.param, model.conv5, path_base+"conv5/")
+    serializers.load_npz(args.param, model.fc6, path_base+"fc6/")
+    serializers.load_npz(args.param, model.fc7, path_base+"fc7/")
+    serializers.load_npz(args.param, model.fc8, path_base+"fc8/")
+    #serializers.load_npz(args.param, model)
     model.train = False #??
 
     return model
@@ -112,18 +123,19 @@ def load_model(args):
 
 def load_data(trans, args, x):
     c= 3
-    s = args.size
+    #s = args.size
     d = args.joint_num * 2
     
-    input_data = np.zeros((len(x),c,s,s))
+    #input_data = np.zeros((len(x),c,s,s))
+    input_data=[]
     label = np.zeros((len(x),d))
 
     for i, line in enumerate(x):
         d,t = trans.transform(line.split(','), args.datadir, args.fname_index, args.joint_index)
-        input_data[i] = d.transpose((2,0,1))
+        input_data.append(d.transpose((2,0,1)))
         label[i] = t
 
-    return input_data, label
+    return np.array(input_data), label
 
 
 def create_tiled_image(perm, out_dir, result_dir, epoch, suffix, N=25):
@@ -147,6 +159,24 @@ def create_tiled_image(perm, out_dir, result_dir, epoch, suffix, N=25):
 
 
 def draw_joints(image, joints, prefix, ignore_joints):
+    skeleton_lines=[
+        [0,1],
+        [1,2],
+        [2,6],
+        [6,3],
+        [3,4],
+        [4,5],
+        [6,7],
+        [7,8],
+        [8,9],
+        [10,11],
+        [11,12],
+        [12,8],
+        [8,13],
+        [13,14],
+        [14,15]
+    ]
+    N=16
     if image.shape[2] != 3:
         _image = image.transpose(1, 2, 0).copy()
     else:
@@ -159,6 +189,8 @@ def draw_joints(image, joints, prefix, ignore_joints):
         ignore_joints = np.array(
             list(zip(ignore_joints[0::2], ignore_joints[1::2])))
 
+    available=[False]*N
+    point=[False]*N
     for i, (x, y) in enumerate(joints):
         if ignore_joints is not None \
                 and (ignore_joints[i][0] == 0 or ignore_joints[i][1] == 0):
@@ -166,11 +198,18 @@ def draw_joints(image, joints, prefix, ignore_joints):
         _image = cv.circle(_image, (int(x), int(y)), 2, (0, 0, 255), -1)
         _image = cv.putText(
             _image, str(i), (int(x), int(y)), cv.FONT_HERSHEY_SIMPLEX,
-            0.5, (255, 255, 255), 3)
+            0.3, (255, 255, 255), 3)
         _image = cv.putText(
             _image, str(i), (int(x), int(y)), cv.FONT_HERSHEY_SIMPLEX,
-            0.5, (0, 0, 0), 1)
+            0.3, (0, 0, 0), 1)
+        available[i]=True
+        point[i]=(x,y)
 
+    for lines in skeleton_lines:
+        start = lines[0]
+        end = lines[1]
+        if available[start] and available[end] :
+            _image = cv.line(_image, point[start], point[end], (0,0,255),2)
     _, fn_img = tempfile.mkstemp()
     basename = os.path.basename(fn_img)
     fn_img = fn_img.replace(basename, basename)
@@ -192,7 +231,7 @@ def test(args):
         model.to_gpu(args.gpu)
 
     # create output dir
-    epoch = int(re.search('epoch-([0-9]+)', args.param).groups()[0])  # args.aram에서 epoch-(숫자) 형식 찾아서 0번째 -> int로
+    epoch = int(10)  # args.aram에서 epoch-(숫자) 형식 찾아서 0번째 -> int로
     result_dir = os.path.dirname(args.param)
     out_dir = '%s/test_%d' % (result_dir, epoch)
     if not os.path.exists(out_dir):
@@ -202,9 +241,8 @@ def test(args):
 
     mean_error = 0.0
     N = len(test_dl)
-
     for i in range(0, N, args.batchsize):
-        lines = test_dl[i:i + args.batchsize]
+        lines = test_dl[args.batchsize*i:args.batchsize*(i+1)]
         trans = Transform(vars(args))
         input_data, labels = load_data(trans, args, lines)
 
@@ -218,6 +256,7 @@ def test(args):
             x = chainer.Variable(input_data)
             t = chainer.Variable(labels)
             model = loss.PoseEstimationError(model)
+            model.predictor.train=False
             ig = labels.astype(np.float32)
             for i in range(labels.shape[0]):
                 for j in range(labels.shape[1]):
@@ -225,7 +264,6 @@ def test(args):
                         ig[i][j] = 0
                     else:
                         ig[i][j]=1
-                
             model(x,t,ig)
 
         if args.gpu >= 0:
@@ -234,8 +272,7 @@ def test(args):
             labels = backends.cuda.to_cpu(labels)
         else:
             preds = model.predictor(x)#?? -> model 코드가 바꼈음
-            #preds = preds.data
-
+            
         for n, line in enumerate(lines):
             img_fn = line.split(',')[args.fname_index]
             img = input_data[n].transpose((1, 2, 0))
@@ -247,6 +284,7 @@ def test(args):
             img_label, label = trans.revert(img, label)
 
             # calc mean_error
+            #print("before",joints)
             error = np.linalg.norm(pred - label) / len(pred)
             mean_error += error
 
@@ -259,6 +297,7 @@ def test(args):
             ig_pred  = np.array(list(zip(ig_pred[0::2], ig_pred[1::2])))
             ig_label = [0 if v == -1 else 1 for v in label.flatten()]
             ig_label  = np.array(list(zip(ig_label[0::2], ig_label[1::2])))
+            
 
             # all limbs
             img_label = draw_joints(
@@ -270,8 +309,6 @@ def test(args):
                 i + n, N, img_fn, error, mean_error / (i + n + 1))
             print(msg, file=fp)
             print(msg)
-
-
             
             fn, ext = os.path.splitext(img_fn)
             tr_fn = '%s/%d-%d_%s_pred%s' % (out_dir, i, n, fn, ext)
@@ -283,7 +320,7 @@ def test(args):
 def tile(args):
     # create output dir
     #epoch = int(re.search('epoch-([0-9]+)', args.param).groups()[0])
-    epoch=1
+    epoch=10
     result_dir = os.path.dirname(args.param)
     out_dir = '%s/test_%d' % (result_dir, epoch)
     if not os.path.exists(out_dir):
@@ -327,7 +364,7 @@ if __name__ == '__main__': #또다른 메인..? 이거는 테스트용인듯.
     args.joint_num = 16
     args.fname_index = 0
     args.joint_index = 1
-    args.size = 220
+    #args.size = 220
     # for line in open(log_fn):
     #     if 'Namespace' in line:
     #         args.joint_num = int(
