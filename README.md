@@ -28,7 +28,7 @@
 
 # Make Output
 - After train, you can make output image file(.png)
-- this is by evaluate_flic.py, but this file has not been completely modified yet. However, it is possible to check the results through image file.
+- this is by evaluate_flic.py, it is possible to check the results through image file.
  
       python scripts/evaluate_flic.py
       --model {result-dir}/{model}.py
@@ -38,6 +38,6 @@
       --n_imgs {num} --resize {size} --seed {seed-num}
       --mode {test or tile}
   
-- if you choose mode as test -> will make result image about test set (it has little bug until, we'll fix it)
+- if you choose mode as test -> will make result image about test set
 - if you choose mode as tile -> will make result image about random image in test set.
 - but, you have to execute test mode first and then execute tile.
