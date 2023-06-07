@@ -241,6 +241,19 @@ def test(args):
 
     mean_error = 0.0
     N = len(test_dl)
+    
+    ## pcp code
+    # to reference variable (not normal variable)
+    arm_up_total = [0]
+    arm_lo_total = [0]
+    leg_up_total = [0]
+    leg_lo_total = [0]
+
+    arm_up_correct = [0]
+    arm_lo_correct = [0]
+    leg_up_correct = [0]
+    leg_lo_correct = [0]
+
     for i in range(0, N, args.batchsize):
         lines = test_dl[args.batchsize*i:args.batchsize*(i+1)]
         trans = Transform(vars(args))
@@ -287,6 +300,23 @@ def test(args):
             #print("before",joints)
             error = np.linalg.norm(pred - label) / len(pred)
             mean_error += error
+            
+            ## pcp
+            ## calc pcp metric distance
+            dis_arm_up = (np.linalg.norm(label[11] - label[12]) + np.linalg.norm(label[13] - label[14])) / 2
+            dis_arm_lo = (np.linalg.norm(label[10] - label[11]) + np.linalg.norm(label[14] - label[15])) / 2
+            dis_leg_up = (np.linalg.norm(label[1] - label[2]) + np.linalg.norm(label[3] - label[4])) / 2
+            dis_leg_lo = (np.linalg.norm(label[0] - label[1]) + np.linalg.norm(label[4] - label[5])) / 2
+
+            ## pcp count
+            for metric, correct_count, total_count in [ (dis_arm_up, arm_up_correct, arm_up_total) , \
+                (dis_arm_lo, arm_lo_correct, arm_lo_total), (dis_leg_up, leg_up_correct, leg_up_total) , (dis_leg_lo, leg_lo_correct, leg_lo_total)]:
+                
+                for i in range(len(label)):
+                    total_count[0] += 1
+                    dis = np.linalg.norm(label[i] - pred[i])
+                    if dis < metric:
+                        correct_count[0] += 1
 
             # create pred, label tuples
             img_pred = np.array(img_pred.copy())
@@ -315,6 +345,22 @@ def test(args):
             la_fn = '%s/%d-%d_%s_label%s' % (out_dir, i, n, fn, ext)
             cv.imwrite(tr_fn, img_pred)
             cv.imwrite(la_fn, img_label)
+        
+        ## pcp
+        ## pcp count printing
+        print("---- pcp value ----")
+        print("%7s %7s %7s %7s %7s" % ("arm_up", "arm_lo", "leg_up", "leg_lo", "avg"))
+        print("%7s %7s %7s %7s %7s" % (round(arm_up_correct[0]/arm_up_total[0] ,3), \
+            round(arm_lo_correct[0]/arm_lo_total[0], 3),\
+            round(leg_up_correct[0]/leg_up_total[0], 3),\
+            round(leg_lo_correct[0]/leg_lo_total[0], 3),\
+            round((arm_up_correct[0]/arm_up_total[0] + arm_lo_correct[0]/arm_lo_total[0] + leg_up_correct[0]/leg_up_total[0] + leg_lo_correct[0]/leg_lo_total[0])/4, 3))
+            )
+        print("-------------------")
+        # print("arm_up: " , )
+        # print("arm_lo: " , )
+        # print("leg_up: " , )
+        # print("leg_lo: " , round(leg_lo_correct[0]/leg_lo_total[0], 2))
 
 
 def tile(args):
