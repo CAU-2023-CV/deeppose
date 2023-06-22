@@ -189,8 +189,6 @@ def draw_joints(image, joints, prefix, ignore_joints):
         ignore_joints = np.array(
             list(zip(ignore_joints[0::2], ignore_joints[1::2])))
 
-    
-    
     available=[False]*N
     point=[False]*N
     for i, (x, y) in enumerate(joints):
@@ -204,19 +202,14 @@ def draw_joints(image, joints, prefix, ignore_joints):
         _image = cv.putText(
             _image, str(i), (int(x), int(y)), cv.FONT_HERSHEY_SIMPLEX,
             0.3, (0, 0, 0), 1)
-        #########
         available[i]=True
         point[i]=(x,y)
-    ##############
+
     for lines in skeleton_lines:
         start = lines[0]
         end = lines[1]
         if available[start] and available[end] :
             _image = cv.line(_image, point[start], point[end], (0,0,255),2)
-        # if start==13 and end ==14: 
-        #     pass
-    
-    
     _, fn_img = tempfile.mkstemp()
     basename = os.path.basename(fn_img)
     fn_img = fn_img.replace(basename, basename)
@@ -236,8 +229,7 @@ def test(args):
     model = load_model(args)
     if args.gpu >= 0:
         model.to_gpu(args.gpu)
-    model = loss.PoseEstimationError(model)
-    model.predictor.train=False
+
     # create output dir
     epoch = int(10)  # args.aram에서 epoch-(숫자) 형식 찾아서 0번째 -> int로
     result_dir = os.path.dirname(args.param)
@@ -249,7 +241,7 @@ def test(args):
 
     mean_error = 0.0
     N = len(test_dl)
-
+    
     ## pcp code
     # to reference variable (not normal variable)
     arm_up_total = [0]
@@ -276,6 +268,8 @@ def test(args):
         with chainer.using_config('volatile', True):
             x = chainer.Variable(input_data)
             t = chainer.Variable(labels)
+            model = loss.PoseEstimationError(model)
+            model.predictor.train=False
             ig = labels.astype(np.float32)
             for i in range(labels.shape[0]):
                 for j in range(labels.shape[1]):
@@ -302,6 +296,12 @@ def test(args):
             label = labels[n]
             img_label, label = trans.revert(img, label)
 
+            #print("before",joints)
+            error = np.linalg.norm(pred - label) / len(pred)
+            mean_error += error
+            
+            ## pcp
+            ## calc pcp metric distance
             dis_arm_up = (np.linalg.norm(label[11] - label[12]) + np.linalg.norm(label[13] - label[14])) / 2
             dis_arm_lo = (np.linalg.norm(label[10] - label[11]) + np.linalg.norm(label[14] - label[15])) / 2
             dis_leg_up = (np.linalg.norm(label[1] - label[2]) + np.linalg.norm(label[3] - label[4])) / 2
@@ -316,11 +316,6 @@ def test(args):
                     dis = np.linalg.norm(label[i] - pred[i])
                     if dis < metric:
                         correct_count[0] += 1
-
-            # calc mean_error
-            #print("before",joints)
-            error = np.linalg.norm(pred - label) / len(pred)
-            mean_error += error
 
             # create pred, label tuples
             img_pred = np.array(img_pred.copy())
@@ -349,7 +344,9 @@ def test(args):
             la_fn = '%s/%d-%d_%s_label%s' % (out_dir, i, n, fn, ext)
             cv.imwrite(tr_fn, img_pred)
             cv.imwrite(la_fn, img_label)
-
+        
+        ## pcp
+        ## pcp count printing
         print("---- pcp value ----")
         print("%7s %7s %7s %7s %7s" % ("arm_up", "arm_lo", "leg_up", "leg_lo", "avg"))
         print("%7s %7s %7s %7s %7s" % (round(arm_up_correct[0]/arm_up_total[0] ,3), \
@@ -359,6 +356,10 @@ def test(args):
             round((arm_up_correct[0]/arm_up_total[0] + arm_lo_correct[0]/arm_lo_total[0] + leg_up_correct[0]/leg_up_total[0] + leg_lo_correct[0]/leg_lo_total[0])/4, 3))
             )
         print("-------------------")
+        # print("arm_up: " , )
+        # print("arm_lo: " , )
+        # print("leg_up: " , )
+        # print("leg_lo: " , round(leg_lo_correct[0]/leg_lo_total[0], 2))
 
 
 def tile(args):
@@ -408,7 +409,7 @@ if __name__ == '__main__': #또다른 메인..? 이거는 테스트용인듯.
     args.joint_num = 16
     args.fname_index = 0
     args.joint_index = 1
-    #args.size = 220
+    args.size = 220
     # for line in open(log_fn):
     #     if 'Namespace' in line:
     #         args.joint_num = int(
