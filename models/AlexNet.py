@@ -44,5 +44,5 @@ class AlexNet(chainer.Chain):
         with chainer.using_config('train', self.train):
             h = F.dropout(F.relu(self.fc6(h)), ratio=0.6)
             h = F.dropout(F.relu(self.fc7(h)), ratio=0.6)
-
+        
         return self.fc8(h)

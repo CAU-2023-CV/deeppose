@@ -4,11 +4,13 @@
 import os
 import cv2 as cv
 import numpy as np
+import chainer
 
 
 class Transform(object):
 
     def __init__(self, args):
+        print(args.items())
         [setattr(self, key, value) for key, value in args.items()]
 
     def transform(self, datum, datadir, train=True,
@@ -19,12 +21,13 @@ class Transform(object):
         self._img = cv.imread(img_fn)
         self.orig = self._img.copy()
         self._joints = np.asarray([int(float(p)) for p in datum[joint_index:]])
+        #self._joints = list(zip(coords[0::2], coords[1::2]))
 
         if hasattr(self, 'padding') and hasattr(self, 'shift'):
             self.crop()
         if hasattr(self, 'flip'):
             self.fliplr()
-        if hasattr(self, 'size'):
+        if hasattr(self, 'resize'):
             self.resizeFunc()
         if hasattr(self, 'lcn'):
             self.contrast()
@@ -34,9 +37,10 @@ class Transform(object):
         center_pt = np.array([w / 2, h / 2], dtype=np.float32)  # x,y order
         joints = list(zip(self._joints[0::2], self._joints[1::2]))
         joints = np.array(joints, dtype=np.float32) - center_pt
+        #joints -= np.array([center_pt[0], center_pt[1]])
         joints[:, 0] /= w
         joints[:, 1] /= h
-        self._joints = joints.flatten()
+        self._joints = joints.flatten() #coord_normalize
 
         return self._img, self._joints
 
@@ -71,14 +75,27 @@ class Transform(object):
         joints = np.asarray([(j[0] - x, j[1] - y) for j in joints])
         self._joints = joints.flatten()
 
+    def apply_zoom(self, image, joints, center_x, center_y, fx=None, fy=None):
+        joint_vecs = joints - np.array([center_x, center_y])
+        #print(fx,fy)
+        if fx is None and fy is None:
+            zoom = 1.0 + np.random.uniform(-self.zoom_range, self.zoom_range)
+            fx, fy = zoom, zoom
+        image = cv.resize(image, None, fx=fx, fy=fy)
+        joint_vecs *= np.array([fx, fy])
+        center_x, center_y = center_x * fx, center_y * fy
+        joints = joint_vecs + np.array([center_x, center_y])
+        return image, joints, center_x, center_y
+    
     def resizeFunc(self):
-        if not isinstance(self.size, int):
+        if not isinstance(self.resize, int):
             raise Exception('self.size should be int')
-        orig_h, orig_w, _ = self._img.shape
+
+        orig_h, orig_w = self._img.shape[:2]
         self._joints[0::2] = self._joints[0::2] / float(orig_w) * self.resize
         self._joints[1::2] = self._joints[1::2] / float(orig_h) * self.resize
-        self._img = cv.resize(self._img, (self.size, self.size),
-                              interpolation=cv.INTER_NEAREST)
+        self._img = cv.resize(self._img, (self.resize, self.resize), interpolation=cv.INTER_NEAREST)
+
 
     def contrast(self):
         if self.lcn:
@@ -116,10 +133,9 @@ class Transform(object):
         #joints = chainer.as_array(joints)
         for i in range(joints.shape[0]):
             for j in range(joints.shape[1]):
-                joints[i][j] = int(joints[i][j].item())
+                joints[i][j] = float(joints[i][j].item())
+        #joints = chainer.as_array(joints)
         joints = joints.astype(np.int32)
-        #joints = joints.astype(np.int32)
-
         if hasattr(self, 'lcn') and self.lcn:
             img -= img.min()
             img /= img.max()

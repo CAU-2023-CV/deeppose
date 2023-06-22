@@ -14,11 +14,9 @@ from chainer.utils import type_check
 
 class MeanSquaredError(chainer.Function):
     """Mean squared error (a.k.a. Euclidean loss) function.
-
     In forward method, it calculates mean squared error between two variables
     with ignoring all elements that the value of ignore_joints at the same
     position is 0.
-
     """
 
     def __init__(self):
@@ -52,10 +50,8 @@ class MeanSquaredError(chainer.Function):
 
 def mean_squared_error(x0, x1, ignore):
     """Mean squared error function.
-
     This function computes mean squared error between two variables. The mean
     is taken over the minibatch. Note that the error is not scaled by 1/2.
-
     """
     return MeanSquaredError()(x0, x1, ignore)
 

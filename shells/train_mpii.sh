@@ -5,9 +5,9 @@ CHAINER_TYPE_CHECK=0 \
 python scripts/train.py \
 --model models/AlexNet.py \
 --gpus 0 \
---epoch 100 \
+--epoch 10 \
 --batchsize 128 \
---snapshot 1 \
+--snapshot 5 \
 --valid_freq 1 \
 --train_csv_fn data/mpii/train_joints.csv \
 --test_csv_fn data/mpii/test_joints.csv \
@@ -29,3 +29,6 @@ python scripts/train.py \
 --joint_index 1 \
 --symmetric_joints "[[12, 13], [11, 14], [10, 15], [2, 3], [1, 4], [0, 5]]" \
 --opt Adam \
+--lr 0.005 \
+# --resume_model results/AlexNet_2023-06-06_19-31-544qie49ag/epoch-3-model.npz \
+# --resume_opt results/AlexNet_2023-06-06_19-31-544qie49ag/epoch-4-state.npz

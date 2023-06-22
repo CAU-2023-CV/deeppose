@@ -18,6 +18,7 @@ from transform import Transform
 from chainer import dataset
 from PIL import Image
 import random
+import cupy
 
 import chainer
 import cmd_options
@@ -65,7 +66,7 @@ def create_logger(args, result_dir):
     logging.info(args)
 
 
-def get_model(model_path, n_joints, result_dir, resume_model):
+def get_model(model_path, n_joints, result_dir, resume_model, device):
     model_fn = os.path.basename(model_path)
     model_name = model_fn.split('.')[0]
     model = SourceFileLoader(model_name, model_path).load_module()#model 파일 소스 받아옴
@@ -81,8 +82,20 @@ def get_model(model_path, n_joints, result_dir, resume_model):
 
     # load model
     if resume_model is not None: #default: None
-        serializers.load_npz(resume_model, model) #resume_model npz파일에서 해당 Model object 가져와서 model에 저장. (아마 checkpoint 역할..?)
+        path_base="predictor/"
+        serializers.load_npz(resume_model, model.conv1, path_base+"conv1/")
+        serializers.load_npz(resume_model, model.conv2, path_base+"conv2/")
+        serializers.load_npz(resume_model, model.conv3, path_base+"conv3/")
+        serializers.load_npz(resume_model, model.conv4, path_base+"conv4/")
+        serializers.load_npz(resume_model, model.conv5, path_base+"conv5/")
+        serializers.load_npz(resume_model, model.fc6, path_base+"fc6/")
+        serializers.load_npz(resume_model, model.fc7, path_base+"fc7/")
+        serializers.load_npz(resume_model, model.fc8, path_base+"fc8/")
+        #serializers.load_npz(resume_model, model) #resume_model npz파일에서 해당 Model object 가져와서 model에 저장. (아마 checkpoint 역할..?)
 
+    model.to_device(device)
+    device.use()
+    
     return model
 
 def get_optimizer(model, opt, lr, adam_alpha=None, adam_beta1=None,
@@ -109,7 +122,15 @@ def get_optimizer(model, opt, lr, adam_alpha=None, adam_beta1=None,
             chainer.optimizer.WeightDecay(weight_decay))
 
     if resume_opt is not None: #checkpoint
-        serializers.load_npz(resume_opt, optimizer)
+        path_base="predictor/"
+        serializers.load_npz(resume_opt, model.predictor.conv1, path_base+"conv1/")
+        serializers.load_npz(resume_opt, model.predictor.conv2, path_base+"conv2/")
+        serializers.load_npz(resume_opt, model.predictor.conv3, path_base+"conv3/")
+        serializers.load_npz(resume_opt, model.predictor.conv4, path_base+"conv4/")
+        serializers.load_npz(resume_opt, model.predictor.conv5, path_base+"conv5/")
+        serializers.load_npz(resume_opt, model.predictor.fc6, path_base+"fc6/")
+        serializers.load_npz(resume_opt, model.predictor.fc7, path_base+"fc7/")
+        serializers.load_npz(resume_opt, model.predictor.fc8, path_base+"fc8/")
 
     return optimizer
 
@@ -171,7 +192,10 @@ if __name__=='__main__':
     args = cmd_options.get_arguments() #실행 때 입력한 arg값 받아옴
     result_dir = create_result_dir(args.model, args.resume_model) #결과값 저장할 directory 생성
     create_logger(args, result_dir) #log 파일 생성함 +최초 log 출력
-    model = get_model(args.model, args.n_joints, result_dir, args.resume_model) #model 받아옴 (AlexNet.py...)
+    gpus = [int(i) for i in args.gpus.split(',')] #gpus:0,1,2...
+    devices = {'main':gpus[0]}
+    device = chainer.cuda.get_device_from_id(0) 
+    model = get_model(args.model, args.n_joints, result_dir, args.resume_model, device) #model 받아옴 (AlexNet.py...)
     model = loss.PoseEstimationError(model) #model에 대한 poseEstimationError 설정 (init)
     opt = get_optimizer(model, args.opt, args.lr, adam_alpha=args.adam_alpha,
                         adam_beta1=args.adam_beta1, adam_beta2=args.adam_beta2,
@@ -192,17 +216,17 @@ if __name__=='__main__':
         args.joint_index, args.symmetric_joints, args.ignore_label
     ) #test dataset에 대한 PoseDataset 설정(init) -> joint파일 받아오기, image load
 
-    train_iter = iterators.MultithreadIterator(train_dataset, args.batchsize, n_threads = 24) #example을 parallel하게 불러옴 repat=True, shuffle=None이 default.
-    test_iter = iterators.MultithreadIterator(test_dataset, args.batchsize, n_threads = 24, repeat=False, shuffle=False)
+
+    train_iter = iterators.MultithreadIterator(train_dataset, args.batchsize, n_threads=24) #example을 parallel하게 불러옴 repat=True, shuffle=None이 default.
+    test_iter = iterators.MultithreadIterator(test_dataset, args.batchsize, n_threads=24, repeat=False, shuffle=False)
     #The dataset is sent to the worker processes in the standard way using pickle.
     #병렬화 처리 초기화하는 코드인듯...
 
-    gpus = [int(i) for i in args.gpus.split(',')] #gpus:0,1,2...
-    devices = {'main':gpus[0]}
     if len(gpus)>2: #1개 이상일때
         for gid in gpus[1:]:
             devices.update({'gpu{}'.format(gid):gid}) #ex)gpu1:1
-    updater = training.ParallelUpdater(train_iter, opt, devices=devices) #optimization
+    
+    updater = training.updaters.ParallelUpdater(train_iter, opt, devices=devices) #optimization
     #Implementation of a parallel GPU Updater. (만약에 CPU사용하면 그냥 device = -1 해주면 chainer에서 알아서 처리하는듯함)
 
     interval = (args.snapshot, 'epoch') #snapshot -> makes regular snapshots of the Trainer object during training.
